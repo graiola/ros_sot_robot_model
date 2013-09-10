@@ -1,0 +1,9 @@
+bin
+build
+lib
+*.user
+*~
+*.pyc
+.pydevproject
+.project
+.settings
