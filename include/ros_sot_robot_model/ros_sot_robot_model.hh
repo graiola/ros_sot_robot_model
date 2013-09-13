@@ -25,33 +25,6 @@ namespace dynamicgraph
 {
   class RosSotRobotModel;
 
-  namespace command
-  {
-    using ::dynamicgraph::command::Command;
-    using ::dynamicgraph::command::Value;
-
-    /// \brief Load from the robot_description parameter of the
-    /// parameter server.
-    ///
-    /// This is the recommended method as it ensures model consistency
-    /// between the control and the other nodes.
-    class LoadFromParameterServer : public Command
-    {
-    public:
-      explicit LoadFromParameterServer(RosSotRobotModel& entity,
-				       const std::string& docstring);
-      Value doExecute();
-    };
-
-    /// \brief Load model from an URDF file.
-    class LoadUrdf : public Command
-    {
-    public:
-      explicit LoadUrdf(RosSotRobotModel& entity, const std::string& docstring);
-      Value doExecute();
-    };
-  } // end of namespace command.
-
   /// \brief This entity load either the current model available in
   /// the robot_description parameter or a specified file and provides
   /// various data such as body positions, jacobians, etc.
@@ -62,11 +35,13 @@ namespace dynamicgraph
   {
     DYNAMIC_GRAPH_ENTITY_DECL();
   public:
-    typedef ::dynamicgraph::sot::MatrixHomogeneous MatrixHomogeneous;
+
     RosSotRobotModel(const std::string& n);
+
     virtual ~RosSotRobotModel();
 
     void loadUrdf(const std::string& filename);
+    void setNamespace (const std::string& ns);
     void loadFromParameterServer();
     Vector curConf() const;
 
@@ -83,6 +58,9 @@ namespace dynamicgraph
 
     /// \brief Name of the parameter where the joints list will be published
     std::string parameterName_;
+
+    /// \brief Name of the controller namespace
+    std::string ns_;
 
     /// \brief When did the last computation occur?
     int lastComputation_;

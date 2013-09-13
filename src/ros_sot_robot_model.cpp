@@ -4,7 +4,7 @@
 
 #include <ros/ros.h>
 
-#include <dynamic-graph/command-getter.h>
+#include <dynamic-graph/all-commands.h>
 #include <dynamic-graph/factory.h>
 #include <dynamic-graph/null-ptr.hh>
 #include <jrl/dynamics/urdf/parser.hh>
@@ -14,47 +14,11 @@
 
 namespace dynamicgraph
 {
-namespace dg = dynamicgraph;
-using ::dynamicgraph::command::Getter;
 
-namespace command
-{
-LoadFromParameterServer::LoadFromParameterServer
-(RosSotRobotModel& entity,
- const std::string& docstring)
-    : Command (entity, std::vector<Value::Type>(), docstring)
-{}
-
-Value
-LoadFromParameterServer::doExecute()
-{
-    RosSotRobotModel& entity =
-            static_cast<RosSotRobotModel&>(owner ());
-    entity.loadFromParameterServer ();
-    return Value ();
-}
-
-LoadUrdf::LoadUrdf(RosSotRobotModel& entity, const std::string& docstring)
-    : Command (entity, std::vector<Value::Type>(), docstring)
-{}
-
-Value
-LoadUrdf::doExecute()
-{
-    RosSotRobotModel& entity =
-            static_cast<RosSotRobotModel&>(owner ());
-
-    const std::vector<Value>& values = getParameterValues ();
-    std::string resourceName = values[0].value ();
-
-    entity.loadUrdf (resourceName);
-    return Value ();
-}
-} // end of namespace command.
-
-RosSotRobotModel::RosSotRobotModel (const std::string& name)
+RosSotRobotModel::RosSotRobotModel(const std::string& name)
     : Dynamic(name,false),
       parameterName_ ("jrl_map"),
+      ns_ ("sot_controller"),
       lastComputation_ (std::numeric_limits<int>::min())
 {
 
@@ -66,13 +30,19 @@ RosSotRobotModel::RosSotRobotModel (const std::string& name)
             "\n"
             "  This is the recommended method.\n"
             "\n";
-    addCommand ("loadFromParameterServer",
-                new command::LoadFromParameterServer (*this, docstring));
+    addCommand("loadFromParameterServer", command::makeCommandVoid0(*this,&RosSotRobotModel::loadFromParameterServer,docstring));
+
     docstring =
             "\n"
             "  Load the robot model from an URDF file.\n"
             "\n";
-    addCommand ("loadUrdf", new command::LoadUrdf (*this, docstring));
+    addCommand("loadUrdf", command::makeCommandVoid1(*this,&RosSotRobotModel::loadUrdf,docstring));
+
+    docstring =
+            "\n"
+            "  Set the controller namespace."
+            "\n";
+    addCommand("setNamespace", command::makeCommandVoid1(*this,&RosSotRobotModel::setNamespace,docstring));
 
     docstring =
             "\n"
@@ -81,42 +51,47 @@ RosSotRobotModel::RosSotRobotModel (const std::string& name)
     addCommand ("curConf", new command::Getter<RosSotRobotModel,Vector> (*this,&RosSotRobotModel::curConf,docstring));
 }
 
-RosSotRobotModel::~RosSotRobotModel ()
+RosSotRobotModel::~RosSotRobotModel()
 {}
 
-void
-RosSotRobotModel::loadUrdf (const std::string& filename)
+void RosSotRobotModel::loadUrdf (const std::string& filename)
 {
     jrl::dynamics::urdf::Parser parser;
+
     m_HDR = parser.parse(filename);
 
-    ros::NodeHandle nh;
+    ros::NodeHandle nh(ns_);
+
     nh.setParam(parameterName_, parser.JointsNamesByRank_);
 }
 
-void
-RosSotRobotModel::loadFromParameterServer ()
+void RosSotRobotModel::setNamespace (const std::string& ns)
+{
+    ns_ = ns;
+}
+
+void RosSotRobotModel::loadFromParameterServer()
 {
     jrl::dynamics::urdf::Parser parser;
 
     rosInit (false);
     std::string robotDescription;
-    ros::param::param<std::string>
-            ("robot_description", robotDescription, "");
+    ros::param::param<std::string> (ns_ + "/robot_description", robotDescription, "");
+
     if (robotDescription.empty ())
-        throw std::runtime_error
-            ("No model available as ROS parameter. Fail.");
+        throw std::runtime_error("No model available as ROS parameter. Fail.");
+
     m_HDR = parser.parseStream (robotDescription);
 
-    ros::NodeHandle nh;
-    nh.setParam(parameterName_, parser.JointsNamesByRank_);
+    ros::NodeHandle nh(ns_);
 
+    nh.setParam(parameterName_, parser.JointsNamesByRank_);
 }
 
 namespace
 {
 
-vectorN convertVector (const ml::Vector& v)
+vectorN convertVector(const ml::Vector& v)
 {
     vectorN res (v.size());
     for (unsigned i = 0; i < v.size(); ++i)
@@ -124,7 +99,7 @@ vectorN convertVector (const ml::Vector& v)
     return res;
 }
 
-ml::Vector convertVector (const vectorN& v)
+ml::Vector convertVector(const vectorN& v)
 {
     ml::Vector res;
     res.resize(v.size());
