@@ -83,9 +83,18 @@ void RosSotRobotModel::loadFromParameterServer()
 
     m_HDR = parser.parseStream (robotDescription);
 
+
+    // HACK
+    /*
+    std::vector<CjrlJoint*> vect = m_HDR->jointVector();
+    std::cout<<"NAME: "<<vect[6]->getName()<<std::endl;
+    m_HDR->rootJoint(*vect[6]);
+    */
+
     ros::NodeHandle nh(ns_);
 
     nh.setParam(parameterName_, parser.JointsNamesByRank_);
+
 }
 
 namespace

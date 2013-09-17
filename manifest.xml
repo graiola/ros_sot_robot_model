@@ -1,0 +1,20 @@
+<package>
+  <description brief="ros_sot_robot_model">
+
+     ros_sot_robot_model
+
+  </description>
+  <author>Gennaro Raiola</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://</url>
+  
+  <rosdep name="boost"/>
+  <rosdep name="jrl-mal"/>
+  
+  <depend package="roscpp"/>
+  <depend package="dynamic_graph_bridge"/>
+
+</package>
+
+
