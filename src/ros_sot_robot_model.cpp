@@ -19,9 +19,7 @@ RosSotRobotModel::RosSotRobotModel(const std::string& name)
     : Dynamic(name,false),
       parameterName_ ("jrl_map"),
       ns_ ("sot_controller"),
-      lastComputation_ (std::numeric_limits<int>::min())
 {
-
     std::string docstring;
 
     docstring =
@@ -82,14 +80,6 @@ void RosSotRobotModel::loadFromParameterServer()
         throw std::runtime_error("No model available as ROS parameter. Fail.");
 
     m_HDR = parser.parseStream (robotDescription);
-
-
-    // HACK
-    /*
-    std::vector<CjrlJoint*> vect = m_HDR->jointVector();
-    std::cout<<"NAME: "<<vect[6]->getName()<<std::endl;
-    m_HDR->rootJoint(*vect[6]);
-    */
 
     ros::NodeHandle nh(ns_);
 

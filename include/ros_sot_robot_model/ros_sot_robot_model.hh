@@ -62,8 +62,6 @@ namespace dynamicgraph
     /// \brief Name of the controller namespace
     std::string ns_;
 
-    /// \brief When did the last computation occur?
-    int lastComputation_;
 
   };
 } // end of namespace dynamicgraph.
