@@ -57,7 +57,7 @@ namespace dynamicgraph
   private:
 
     /// \brief Name of the parameter where the joints list will be published
-    std::string parameterName_;
+    std::string jointsParameterName_;
 
     /// \brief Name of the controller namespace
     std::string ns_;

@@ -17,8 +17,8 @@ namespace dynamicgraph
 
 RosSotRobotModel::RosSotRobotModel(const std::string& name)
     : Dynamic(name,false),
-      parameterName_ ("jrl_map"),
-      ns_ ("sot_controller"),
+      jointsParameterName_("jrl_joints_list"),
+      ns_("sot_controller")
 {
     std::string docstring;
 
@@ -60,7 +60,7 @@ void RosSotRobotModel::loadUrdf (const std::string& filename)
 
     ros::NodeHandle nh(ns_);
 
-    nh.setParam(parameterName_, parser.JointsNamesByRank_);
+    nh.setParam(jointsParameterName_, parser.JointsNamesByRank_);
 }
 
 void RosSotRobotModel::setNamespace (const std::string& ns)
@@ -83,7 +83,7 @@ void RosSotRobotModel::loadFromParameterServer()
 
     ros::NodeHandle nh(ns_);
 
-    nh.setParam(parameterName_, parser.JointsNamesByRank_);
+    nh.setParam(jointsParameterName_, parser.JointsNamesByRank_);
 
 }
 
@@ -123,6 +123,7 @@ Vector RosSotRobotModel::curConf() const
     if (nh.hasParam(param_name)){
         nh.getParam(param_name, ffpose);
         ROS_ASSERT(ffpose.getType() == XmlRpc::XmlRpcValue::TypeArray);
+        ROS_ASSERT(ffpose.size() == 6);
         for (int32_t i = 0; i < ffpose.size(); ++i)
         {
             ROS_ASSERT(ffpose[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
