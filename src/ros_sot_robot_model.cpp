@@ -121,12 +121,40 @@ ml::Vector convertVector(const vectorN& v)
 
 Vector RosSotRobotModel::curConf() const
 {
+
+    // The first 6 dofs are associated to the Freeflyer frame
+    // Freeflyer reference frame should be the same as global
+    // frame so that operational point positions correspond to
+    // position in freeflyer frame.
+
+    XmlRpc::XmlRpcValue ffpose;
+    ros::NodeHandle nh(ns_);
+    std::string param_name = "ffpose";
+    if (nh.hasParam(param_name)){
+        nh.getParam(param_name, ffpose);
+        ROS_ASSERT(ffpose.getType() == XmlRpc::XmlRpcValue::TypeArray);
+        for (int32_t i = 0; i < ffpose.size(); ++i)
+        {
+            ROS_ASSERT(ffpose[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
+        }
+    }
+    else
+    {
+        ffpose.setSize(6);
+        for (int32_t i = 0; i < ffpose.size(); ++i)
+            ffpose[i] = 0.0;
+    }
+
     if (!m_HDR )
         throw std::runtime_error ("no robot loaded");
     else {
         vectorN currConf = m_HDR->currentConfiguration();
         Vector res;
         res = convertVector(currConf);
+
+        for (int32_t i = 0; i < ffpose.size(); ++i)
+            res(i) = static_cast<double>(ffpose[i]);
+
         return res;
     }
 }
