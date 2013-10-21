@@ -129,7 +129,7 @@ void RosSotRobotModel::publishJointNames(){
     std::vector<CjrlJoint*> actJointsVect = actuatedJoints();
     for (int i=0;i<tmp_jv.size();i++)
         if (std::find(actJointsVect.begin(), actJointsVect.end(),tmp_jv[i])!=actJointsVect.end())
-            JointsNamesByRank_[tmp_jv[i]->rankInConfiguration()-6] = tmp_jv[i]->getName();
+            jointNames_[tmp_jv[i]->rankInConfiguration()-6] = tmp_jv[i]->getName();
 
     ros::NodeHandle nh(ns_);
     nh.setParam(pn_, jointNames_);
