@@ -50,6 +50,7 @@ namespace ml = maal::boost;
 # include <sot-dynamic/dynamic.h>
 # include <jrl/dynamics/urdf/parser.hh>
 # include "XmlRpcValue.h"
+# include <ros/ros.h>
 
 namespace dynamicgraph
 {
@@ -72,19 +73,11 @@ namespace dynamicgraph
 
     void loadUrdf(const std::string& filename);
     void loadFromParameterServer();
-    void publishJointNames();
+    void setParamsJointNames();
+    void setParamsJointOrientations();
     void setNamespace (const std::string& ns);
     void setParameterName (const std::string& pn);
     Vector curConf() const;
-
-  protected:
-
-    unsigned getDimension () const
-    {
-      if (!m_HDR)
-	throw std::runtime_error ("no robot loaded");
-      return m_HDR->numberDof();
-    }
 
   private:
 
@@ -96,7 +89,6 @@ namespace dynamicgraph
 
     /// \brief List of actuated joints ordered by rank
     XmlRpc::XmlRpcValue jointNames_;
-
 
   };
 } // end of namespace dynamicgraph.

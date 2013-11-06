@@ -43,6 +43,91 @@
 # include "dynamic_graph_bridge/ros_init.hh"
 # include <ros_sot_robot_model/ros_sot_robot_model.hh>
 
+# include "tf/transform_listener.h"
+# include "tf/message_filter.h"
+
+namespace
+{
+// Function taken from the parser
+matrix4d normalizeFrameOrientation (jrl::dynamics::urdf::Parser::UrdfJointConstPtrType urdfJoint)
+{
+    if (!urdfJoint)
+        throw std::runtime_error
+            ("invalid joint in normalizeFrameOrientation");
+    matrix4d result;
+    result.setIdentity ();
+
+    vector3d x (urdfJoint->axis.x,
+                urdfJoint->axis.y,
+                urdfJoint->axis.z);
+    x.normalize ();
+
+    vector3d y (0., 0., 0.);
+    vector3d z (0., 0., 0.);
+
+    unsigned smallestComponent = 0;
+    for (unsigned i = 0; i < 3; ++i)
+        if (std::fabs(x[i]) < std::fabs(x[smallestComponent]))
+            smallestComponent = i;
+
+    y[smallestComponent] = 1.;
+    z = x ^ y;
+    y = z ^ x;
+    // (x, y, z) is an orthonormal basis.
+
+    for (unsigned i = 0; i < 3; ++i)
+    {
+        result (i, 0) = x[i];
+        result (i, 1) = y[i];
+        result (i, 2) = z[i];
+    }
+
+    return result;
+}
+
+vectorN convertVector(const ml::Vector& v)
+{
+    vectorN res (v.size());
+    for (unsigned i = 0; i < v.size(); ++i)
+        res[i] = v(i);
+    return res;
+}
+
+ml::Vector convertVector(const vectorN& v)
+{
+    ml::Vector res;
+    res.resize(v.size());
+    for (unsigned i = 0; i < v.size(); ++i)
+        res(i) = v[i];
+    return res;
+}
+
+int sign(double value){
+
+    if(value==0)
+        return 0;
+    if(value>0)
+        return 1;
+    if(value<0)
+        return -1;
+
+}
+
+ml::Vector mat2quat(const matrix4d& mat){
+
+      ml::Vector  quat;
+      quat.resize(4);
+      quat(3) = 0.5 * std::sqrt(mat(0,0)+mat(1,1)+mat(2,2)+1);
+      quat(0) = 0.5 * sign(mat(2,1)-mat(1,2))*std::sqrt(mat(0,0)-mat(1,1)-mat(2,2)+1);
+      quat(1) = 0.5 * sign(mat(0,2)-mat(2,0))*std::sqrt(mat(1,1)-mat(2,2)-mat(0,0)+1);
+      quat(2) = 0.5 * sign(mat(1,0)-mat(0,1))*std::sqrt(mat(2,2)-mat(0,0)-mat(1,1)+1);
+      return quat;
+}
+
+} // end of anonymous namespace.
+
+
+
 namespace dynamicgraph
 {
 
@@ -51,6 +136,7 @@ RosSotRobotModel::RosSotRobotModel(const std::string& name)
       pn_("jrl_joints_list"),
       ns_("sot_controller")
 {
+
     std::string docstring;
 
     docstring =
@@ -94,7 +180,8 @@ void RosSotRobotModel::loadUrdf (const std::string& filename)
 
     m_HDR = parse(filename);
 
-    publishJointNames();
+    setParamsJointNames();
+    setParamsJointOrientations();
 }
 
 void RosSotRobotModel::setNamespace (const std::string& ns)
@@ -118,11 +205,12 @@ void RosSotRobotModel::loadFromParameterServer()
 
     m_HDR = parseStream(robotDescription);
 
-    publishJointNames();
+    setParamsJointNames();
+    setParamsJointOrientations();
 
 }
 
-void RosSotRobotModel::publishJointNames(){
+void RosSotRobotModel::setParamsJointNames(){
 
     // Load a list of joints ordered by rank
     std::vector<CjrlJoint*> tmp_jv = m_HDR->jointVector();
@@ -136,54 +224,33 @@ void RosSotRobotModel::publishJointNames(){
 
 }
 
-namespace
-{
+void RosSotRobotModel::setParamsJointOrientations(){
 
-vectorN convertVector(const ml::Vector& v)
-{
-    vectorN res (v.size());
-    for (unsigned i = 0; i < v.size(); ++i)
-        res[i] = v(i);
-    return res;
+    ::urdf::Model model = urdfModel();
+
+    ros::NodeHandle nh(ns_);
+
+    for (int i = 0; i < jointNames_.size(); ++i)
+    {
+        XmlRpc::XmlRpcValue &name_value = jointNames_[i];
+        const std::string joint_name = static_cast<std::string>(name_value);
+        std::map<std::string, boost::shared_ptr< ::urdf::Joint>  >::const_iterator it;
+        it = model.joints_.find(joint_name);
+        if (it->second){
+            matrix4d compMatrix = normalizeFrameOrientation(model.getJoint (it->first));
+            ml::Vector quat = mat2quat(compMatrix);
+
+            nh.setParam(joint_name + "/quat/x",quat(0));
+            nh.setParam(joint_name + "/quat/y",quat(1));
+            nh.setParam(joint_name + "/quat/z",quat(2));
+            nh.setParam(joint_name + "/quat/w",quat(3));
+        }
+    }
+
 }
-
-ml::Vector convertVector(const vectorN& v)
-{
-    ml::Vector res;
-    res.resize(v.size());
-    for (unsigned i = 0; i < v.size(); ++i)
-        res(i) = v[i];
-    return res;
-}
-
-} // end of anonymous namespace.
 
 Vector RosSotRobotModel::curConf() const
 {
-
-    // The first 6 dofs are associated to the Freeflyer frame
-    // Freeflyer reference frame should be the same as global
-    // frame so that operational point positions correspond to
-    // position in freeflyer frame.
-
-    XmlRpc::XmlRpcValue ffpose;
-    ros::NodeHandle nh(ns_);
-    std::string param_name = "ffpose";
-    if (nh.hasParam(param_name)){
-        nh.getParam(param_name, ffpose);
-        ROS_ASSERT(ffpose.getType() == XmlRpc::XmlRpcValue::TypeArray);
-        ROS_ASSERT(ffpose.size() == 6);
-        for (int32_t i = 0; i < ffpose.size(); ++i)
-        {
-            ROS_ASSERT(ffpose[i].getType() == XmlRpc::XmlRpcValue::TypeDouble);
-        }
-    }
-    else
-    {
-        ffpose.setSize(6);
-        for (int32_t i = 0; i < ffpose.size(); ++i)
-            ffpose[i] = 0.0;
-    }
 
     if (!m_HDR )
         throw std::runtime_error ("no robot loaded");
@@ -191,9 +258,6 @@ Vector RosSotRobotModel::curConf() const
         vectorN currConf = m_HDR->currentConfiguration();
         Vector res;
         res = convertVector(currConf);
-
-        for (int32_t i = 0; i < ffpose.size(); ++i)
-            res(i) = static_cast<double>(ffpose[i]);
 
         return res;
     }
